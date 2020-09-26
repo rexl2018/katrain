@@ -99,6 +99,7 @@ class KaTrainGui(Screen, KaTrainBase):
 
         self._keyboard = Window.request_keyboard(None, self, "")
         self._keyboard.bind(on_key_down=self._on_keyboard_down)
+        Clock.schedule_interval(self.animate_pondering, 0.1)
 
     def log(self, message, level=OUTPUT_INFO):
         super().log(message, level)
@@ -117,6 +118,12 @@ class KaTrainGui(Screen, KaTrainBase):
             or (level == OUTPUT_KATAGO_STDERR and "error" in message.lower() and "tuning" not in message.lower())
         ) and getattr(self, "controls", None):
             self.controls.set_status(f"ERROR: {message}", STATUS_ERROR)
+
+    def animate_pondering(self, *_args):
+        if not self.idle_analysis:
+            self.board_controls.engine_status_pondering = -1
+        else:
+            self.board_controls.engine_status_pondering += 5
 
     @property
     def play_analyze_mode(self):
@@ -189,14 +196,14 @@ class KaTrainGui(Screen, KaTrainBase):
                 and cn.analysis_ready
                 and cn.parent.analysis_ready
                 and not cn.children
-                and not self.game.ended
+                and not self.game.end_result
             ):
                 self.game.analyze_undo(cn)  # not via message loop
             if (
                 cn.analysis_ready
                 and next_player.ai
                 and not cn.children
-                and not self.game.ended
+                and not self.game.end_result
                 and not (teaching_undo and cn.auto_undo is None)
             ):  # cn mismatch stops this if undo fired. avoid message loop here or fires repeatedly.
                 self._do_ai_move(cn)
@@ -259,7 +266,7 @@ class KaTrainGui(Screen, KaTrainBase):
                 player_info.name = move_tree.root.get_property("P" + bw)
                 self.update_player(bw)
         self.controls.graph.initialize_from_game(self.game.root)
-        self.controls.rank_graph.initialize_from_game(self.game.root)
+        # self.controls.rank_graph.initialize_from_game(self.game.root)
         self.update_state(redraw_board=True)
 
     def _do_ai_move(self, node=None):
@@ -278,6 +285,9 @@ class KaTrainGui(Screen, KaTrainBase):
                 n_times = 2
         self.board_gui.animating_pv = None
         self.game.undo(n_times)
+
+    def _do_resign(self):
+        self.game.current_node.end_state = f"{self.game.current_node.player}+R"
 
     def _do_redo(self, n_times=1):
         self.board_gui.animating_pv = None
@@ -323,7 +333,7 @@ class KaTrainGui(Screen, KaTrainBase):
         self.controls.timer.paused = True
         if not self.teacher_settings_popup:
             self.teacher_settings_popup = I18NPopup(
-                title_key="teacher settings", size=[dp(800), dp(700)], content=ConfigTeacherPopup(self)
+                title_key="teacher settings", size=[dp(800), dp(750)], content=ConfigTeacherPopup(self)
             ).__self__
             self.teacher_settings_popup.content.popup = self.teacher_settings_popup
         self.teacher_settings_popup.open()
@@ -332,7 +342,7 @@ class KaTrainGui(Screen, KaTrainBase):
         self.controls.timer.paused = True
         if not self.config_popup:
             self.config_popup = I18NPopup(
-                title_key="general settings title", size=[dp(1200), dp(800)], content=ConfigPopup(self)
+                title_key="general settings title", size=[dp(1200), dp(950)], content=ConfigPopup(self)
             ).__self__
             self.config_popup.content.popup = self.config_popup
         self.config_popup.open()
@@ -429,6 +439,7 @@ class KaTrainGui(Screen, KaTrainBase):
             "a": ("analyze-extra", "extra"),
             "s": ("analyze-extra", "equalize"),
             "d": ("analyze-extra", "sweep"),
+            "f": ("analyze-extra", "alternative"),
             "p": ("play", None),
             "down": ("switch-branch", 1),
             "up": ("switch-branch", -1),
@@ -452,6 +463,7 @@ class KaTrainGui(Screen, KaTrainBase):
         if popup:
             if keycode[1] in ["f5", "f6", "f7", "f8"]:  # switch between popups
                 popup.dismiss()
+                return
             else:
                 return
 
@@ -467,9 +479,9 @@ class KaTrainGui(Screen, KaTrainBase):
         elif keycode[1] in ["`", "~", "m"] and "ctrl" not in modifiers:
             self.zen = (self.zen + 1) % 3
         elif keycode[1] in ["left", "z"]:
-            self("undo", 1 + ("shift" in modifiers) * 9 + ("ctrl" in modifiers) * 999)
+            self("undo", 1 + ("alt" in modifiers) * 9 + ("ctrl" in modifiers) * 999)
         elif keycode[1] in ["right", "x"]:
-            self("redo", 1 + ("shift" in modifiers) * 9 + ("ctrl" in modifiers) * 999)
+            self("redo", 1 + ("alt" in modifiers) * 9 + ("ctrl" in modifiers) * 999)
         elif keycode[1] == "n" and "ctrl" in modifiers:
             self("new-game-popup")
         elif keycode[1] == "l" and "ctrl" in modifiers:

@@ -105,12 +105,6 @@ msgstr "AI Zug erzwingen"
 msgid "pass-button-text"
 msgstr "Passen"
 
-msgid "teaching undo message"
-msgstr ""
-"Zug {move} zurückgenommen, da er {points_lost:.1f} Punkte verliert. Bewege "
-"Mauszeiger über den Zug,um die erwartete Widerlegung zu sehen. Bitte "
-"versuche es erneut."
-
 msgid "ai-ponder"
 msgstr ""
 "Zeigt den Enginestatus an von grün (Leerlauf) bis orange(Zugberechnung). Ist"
@@ -636,18 +630,62 @@ msgstr "Geschätzte Spielstärke"
 msgid "reanalyze max visits"
 msgstr "Anzahl der Visits pro Zug"
 
-#. TODO - on move tree editing
 msgid "Delete Node"
-msgstr "Delete Node"
+msgstr "Node löschen"
 
-#. TODO - theme name
 msgid "theme:red-green-colourblind"
-msgstr "Red-Green Colourblind"
+msgstr "Rot-Grün-farbenblind"
 
-#. TODO - theme name
 msgid "theme:normal"
-msgstr "Default Theme"
+msgstr "Standard-Farbschema"
 
-#. TODO - theme label
 msgid "theme"
-msgstr "Colour Theme"
+msgstr "Farbschema"
+
+msgid "engine:altcommand:hint"
+msgstr ""
+"Kompletter Befehl um die Engine zu starten. Alle anderen Modelloptionen "
+"werden ignoriert."
+
+msgid "engine:altcommand"
+msgstr "Engine-Befehl überschreiben"
+
+msgid "download katago button"
+msgstr "KataGo-Versionen herunterladen"
+
+msgid "katago binaries available"
+msgstr "{num} KataGo-Programme verfügbar"
+
+msgid "default katago option"
+msgstr "Plattform erkennen und angebotenes Programm benutzen"
+
+msgid "All binaries downloaded"
+msgstr "Alle verfügbaren Programme wurden bereits heruntergeladen"
+
+msgid "Engine missing DLL"
+msgstr ""
+"Konnte KataGo wegen fehlender DLL nicht starten. Überprüf die Anforderungen "
+"in der KataGo-Dokumentation oder versuch, KataGo alleine zu starten, um "
+"Einzelheiten zu erfahren."
+
+msgid "show point loss as text"
+msgstr "Zeig den Punkteverlust auf Beste Züge"
+
+#. TODO - updated
+msgid "teaching undo message"
+msgstr ""
+"Zug {move} zurückgenommen, da er {points_lost:.1f} Punkte verliert. Bewege "
+"Mauszeiger über den Zug,um die erwartete Widerlegung zu sehen. Bitte "
+"versuche es erneut."
+
+#. resign the game
+msgid "resign"
+msgstr "Aufgeben"
+
+#.  - Analyze again but exclude all currently considered moves
+msgid "analysis:alternatives"
+msgstr "Finde alternative Züge"
+
+#.  - status message
+msgid "alternative analysis"
+msgstr "Suche nach alternativen Zügen"

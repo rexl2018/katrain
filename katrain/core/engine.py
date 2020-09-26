@@ -1,7 +1,8 @@
 import copy
 import json
 import os
-import shlex, subprocess
+import shlex
+import subprocess
 import threading
 import time
 import traceback
@@ -30,7 +31,7 @@ class KataGoEngine:
     def get_rules(node):
         return KataGoEngine.RULESETS.get(str(node.ruleset).lower(), "japanese")
 
-    def __init__(self, katrain, config, override_command=None):
+    def __init__(self, katrain, config):
         self.katrain = katrain
         self.queries = {}  # outstanding query id -> start time and callback
         self.config = config
@@ -41,12 +42,12 @@ class KataGoEngine:
         self._lock = threading.Lock()
         self.analysis_thread = None
         self.stderr_thread = None
+        self.shell = False
 
         exe = config.get("katago", "").strip()
-        if override_command:
-            self.command = override_command
-        elif exe.startswith('"') and exe.endswith('"'):
-            self.command = exe.strip('"')
+        if config.get("altcommand", ""):
+            self.command = config["altcommand"]
+            self.shell = True
         else:
             if not exe:
                 if platform == "win":
@@ -76,15 +77,25 @@ class KataGoEngine:
             elif not os.path.isfile(cfg):
                 self.katrain.log(i18n._("Kata config not found").format(config=cfg), OUTPUT_ERROR)
                 return  # don't start
-            self.command = f'"{exe}" analysis -model "{model}" -config "{cfg}" -analysis-threads {config["threads"]}'
+            self.command = shlex.split(
+                f'"{exe}" analysis -model "{model}" -config "{cfg}" -analysis-threads {config["threads"]}'
+            )
         self.start()
 
     def start(self):
         try:
             self.katrain.log(f"Starting KataGo with {self.command}", OUTPUT_DEBUG)
-
+            startupinfo = None # stop command box popups on windows/pyinstaller
+            if hasattr(subprocess, "STARTUPINFO"):
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             self.katago_process = subprocess.Popen(
-                shlex.split(self.command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+                self.command,
+                startupinfo=startupinfo,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=self.shell,
             )
         except (FileNotFoundError, PermissionError, OSError) as e:
             self.katrain.log(
@@ -107,8 +118,12 @@ class KataGoEngine:
         ok = self.katago_process and self.katago_process.poll() is None
         if not ok and exception_if_dead:
             if self.katago_process:
-                os_error += f"status {self.katago_process and self.katago_process.poll()}"
-                died_msg = i18n._("Engine died unexpectedly").format(error=os_error)
+                code = self.katago_process and self.katago_process.poll()
+                if code == 3221225781:
+                    died_msg = i18n._("Engine missing DLL")
+                else:
+                    os_error += f"status {code}"
+                    died_msg = i18n._("Engine died unexpectedly").format(error=os_error)
                 self.katrain.log(died_msg, OUTPUT_ERROR)
                 self.katago_process = None
             else:
@@ -150,7 +165,7 @@ class KataGoEngine:
     def _analysis_read_thread(self):
         while self.katago_process is not None:
             try:
-                line = self.katago_process.stdout.readline()
+                line = self.katago_process.stdout.readline().strip()
                 if self.katago_process and not line:
                     self.check_alive(exception_if_dead=True)
             except OSError as e:
@@ -224,13 +239,15 @@ class KataGoEngine:
         visits: int = None,
         analyze_fast: bool = False,
         time_limit=True,
+        find_alternatives: bool = False,
         priority: int = 0,
         ownership: Optional[bool] = None,
         next_move: Optional[GameNode] = None,
         extra_settings: Optional[Dict] = None,
     ):
-        moves = [m for node in analysis_node.nodes_from_root for m in node.moves]
-        initial_stones = analysis_node.root.placements
+        nodes = analysis_node.nodes_from_root
+        moves = [m for node in nodes for m in node.moves]
+        initial_stones = [m for node in nodes for m in node.placements]
         if next_move:
             moves.append(next_move)
         if ownership is None:
@@ -239,6 +256,17 @@ class KataGoEngine:
             visits = self.config["max_visits"]
             if analyze_fast and self.config.get("fast_visits"):
                 visits = self.config["fast_visits"]
+
+        if find_alternatives:
+            avoid = [
+                {
+                    "moves": list(analysis_node.analysis["moves"].keys()),
+                    "player": analysis_node.next_player,
+                    "untilDepth": 1,
+                }
+            ]
+        else:
+            avoid = []
 
         size_x, size_y = analysis_node.board_size
         settings = copy.copy(self.override_settings)
@@ -253,11 +281,13 @@ class KataGoEngine:
             "analyzeTurns": [len(moves)],
             "maxVisits": visits,
             "komi": analysis_node.komi,
+            "avoidMoves": avoid,
             "boardXSize": size_x,
             "boardYSize": size_y,
             "includeOwnership": ownership and not next_move,
             "includePolicy": not next_move,
             "initialStones": [[m.player, m.gtp()] for m in initial_stones],
+            "initialPlayer": analysis_node.root.next_player,
             "moves": [[m.player, m.gtp()] for m in moves],
             "overrideSettings": {**settings, **(extra_settings or {})},
         }
