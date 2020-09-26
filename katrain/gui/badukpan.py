@@ -389,6 +389,37 @@ class BadukPanWidget(Widget):
             self.canvas.after.clear()
             self.active_pv_moves = []
 
+            # hints or PV
+            if katrain.analysis_controls.hints.active and not game_ended:
+                hint_moves = current_node.candidate_moves
+                for i, move_dict in enumerate(hint_moves):
+                    move = Move.from_gtp(move_dict["move"])
+                    if move.coords is not None:
+                        alpha, scale = GHOST_ALPHA, 1.0
+                        if move_dict["visits"] < VISITS_FRAC_SMALL * hint_moves[0]["visits"]:
+                            scale = 0.8
+                        if "pv" in move_dict:
+                            self.active_pv_moves.append((move.coords, move_dict["pv"], current_node))
+                        else:
+                            katrain.log(f"PV missing for move_dict {move_dict}", OUTPUT_DEBUG)
+                        draw_circle(
+                            (self.gridpos_x[move.coords[0]], self.gridpos_y[move.coords[1]]),
+                            col=[*self.eval_color(move_dict["pointsLost"])[:3], alpha],
+                            r=self.stone_size * scale,
+                        )
+                        
+                        if i == 0:
+                            #Color(*TOP_MOVE_BORDER_COLOR)
+                            Color(0.01, 0.99, 0.01)
+                            Line(
+                                circle=(
+                                    self.gridpos_x[move.coords[0]],
+                                    self.gridpos_y[move.coords[1]],
+                                    self.stone_size * scale - 1.2,
+                                ),
+                                width=dp(1.2),
+                            )
+
             # children of current moves in undo / review
             alpha = GHOST_ALPHA
             if katrain.analysis_controls.show_children.active:
@@ -415,6 +446,11 @@ class BadukPanWidget(Widget):
                             evalscale=scale,
                             scale=scale,
                         )
+                        draw_circle(
+                            (self.gridpos_x[move.coords[0]], self.gridpos_y[move.coords[1]]),
+                            col=[0.20, 0.90, 0.50, 0.9],
+                            r=self.stone_size * scale * 0.6,
+                        )
 
             # hints or PV
             if katrain.analysis_controls.hints.active and not game_ended:
@@ -429,21 +465,24 @@ class BadukPanWidget(Widget):
                             self.active_pv_moves.append((move.coords, move_dict["pv"], current_node))
                         else:
                             katrain.log(f"PV missing for move_dict {move_dict}", OUTPUT_DEBUG)
-                        draw_circle(
-                            (self.gridpos_x[move.coords[0]], self.gridpos_y[move.coords[1]]),
-                            col=[*self.eval_color(move_dict["pointsLost"])[:3], alpha],
-                            r=self.stone_size * scale,
-                        )
+                        
                         if i == 0:
-                            Color(*TOP_MOVE_BORDER_COLOR)
-                            Line(
-                                circle=(
-                                    self.gridpos_x[move.coords[0]],
-                                    self.gridpos_y[move.coords[1]],
-                                    self.stone_size * scale - 1.2,
-                                ),
-                                width=dp(1.2),
-                            )
+                            Color(0.00, 0.01, 0.99)
+                            draw_text(
+                                pos=(self.gridpos_x[move.coords[0]], self.gridpos_y[move.coords[1]]), 
+                                text=str(format(move_dict["visits"]/1000.0, '.1f'))+'K', 
+                                font_size=self.grid_size / 2.6, 
+                                font_name="Roboto"
+                                )
+                        else: 
+                            if(move_dict["pointsLost"]>0.05):
+                                Color(0.99, 0.01, 0.01)
+                                draw_text(
+                                    pos=(self.gridpos_x[move.coords[0]], self.gridpos_y[move.coords[1]]), 
+                                    text=str(format(move_dict["pointsLost"], '.1f')), 
+                                    font_size=self.grid_size / 2.4, 
+                                    font_name="Roboto"
+                                    )
 
             # hover next move ghost stone
             if self.ghost_stone:
