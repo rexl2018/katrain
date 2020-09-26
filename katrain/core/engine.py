@@ -164,6 +164,10 @@ class KataGoEngine:
                 continue
             try:
                 analysis = json.loads(line)
+                self.katrain.log(f"Got output from katago: {analysis}", OUTPUT_ERROR)
+                
+                if "moveInfos" not in analysis:
+                    continue
                 if "id" not in analysis:
                     self.katrain.log(f"Error without ID {analysis} received from KataGo", OUTPUT_ERROR)
                     continue
